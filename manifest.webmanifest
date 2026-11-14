@@ -1,0 +1,9 @@
+{
+  "name": "Inventário Digital Lima Virtual",
+  "short_name": "Inventory",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#071426",
+  "theme_color": "#081a30",
+  "lang": "pt-BR"
+}

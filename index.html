@@ -139,11 +139,11 @@ function render() {
     const hay=[x.name,x.description,x.category,x.platform,x.current_version,(x.tags||[]).join(' ')].join(' ').toLocaleLowerCase('pt-BR');
     return (!q||hay.includes(q))&&(!cat||x.category===cat);
   });
-  $('items').innerHTML=filtered.length?filtered.map(x=>{
+  $('items').innerHTML=filtered.length?filtered.map((x,index)=>{
     const fs=x.software_files||[],vs=x.software_versions||[];
     const latest=vs.find(v=>v.version===x.current_version)||vs[0];
     return `<article class="card">
-      <div class="inline"><span class="tag">${esc(x.category||'Sem categoria')}</span>${x.platform?`<span class="tag">${esc(x.platform)}</span>`:''}</div>
+      <div class="inline"><span class="tag">Nº ${index+1}</span><span class="tag">${esc(x.category||'Sem categoria')}</span>${x.platform?`<span class="tag">${esc(x.platform)}</span>`:''}</div>
       <h3>${esc(x.name)}</h3><p>${esc(x.description||'Sem descrição cadastrada.')}</p>
       <div class="meta">Versão atual: <b>${esc(x.current_version||'Não informada')}</b><br>${fs.length} arquivo(s) · ${vs.length} versão(ões)<br>Atualizado em ${x.updated_at?new Date(x.updated_at).toLocaleDateString('pt-BR'):'—'}</div>
       <div class="card-actions">

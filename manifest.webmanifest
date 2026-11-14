@@ -1,0 +1,9 @@
+{
+  "name": "Inventário Digital Lima Virtual",
+  "short_name": "Inventário Lima",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#071426",
+  "theme_color": "#081a30",
+  "description": "Inventário privado de softwares, arquivos e versões."
+}

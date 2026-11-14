@@ -27,11 +27,18 @@ button,input,textarea,select{font:inherit}button{cursor:pointer}.wrap{max-width:
 <h1>Seu inventário digital.</h1>
 <p>Organize, armazene, pesquise e controle seus softwares, arquivos ZIP e versões em um único ambiente privado. Seu inventário acompanha você no celular e no computador.</p>
 <div class="actions">
+<button id="demo-open" class="btn secondary">▶ Testar demonstração</button>
+<a class="btn" href="https://lima-virtual-pro.github.io/Painel-Lima-Virtual/" target="_blank" rel="noopener">Adquirir licença</a>
 <button id="login" class="btn">Entrar com Google</button>
 <button id="logout" class="btn secondary hidden">Sair</button>
 <button id="refresh" class="btn secondary hidden">Atualizar</button>
 <button id="export" class="btn ghost hidden">Exportar CSV</button>
 </div>
+</section>
+<section id="demo-preview" class="notice hidden" aria-live="polite">
+<strong>Demonstração do Inventory</strong>
+<p class="subtle">Exemplo fictício: cadastro de software, controle de versões, arquivos originais, histórico e exportação. Entre com Google para consultar o inventário compartilhado. A licença individual libera novas inclusões e atualizações por 30 dias.</p>
+<div class="inline"><span class="tag">Software: Exemplo de aplicação web</span><span class="tag">Versão: 1.0.0</span><span class="tag">Arquivos: 2</span></div>
 </section>
 <div id="message" role="status" aria-live="polite"></div>
 <section id="license-panel" class="notice hidden" aria-live="polite"><strong id="license-title">Situação da licença</strong><div id="license-detail" class="subtle"></div></section>
@@ -102,7 +109,11 @@ function message(text,error=false) {
 }
 async function api(body) {
   const {data,error}=await sb.functions.invoke('inventory-api',{body});
-  if(error) throw error;
+  if(error) {
+    let detail=error.message||'Falha na comunicação com o servidor.';
+    try { const payload=await error.context.clone().json(); if(payload?.error) detail=payload.error; if(payload?.detail) detail+=' '+payload.detail; } catch {}
+    throw new Error(detail);
+  }
   if(data?.error) throw new Error(data.error);
   return data;
 }
@@ -289,7 +300,7 @@ async function trashSoftware(item) {
 async function showTrash(){
   try{const r=await api({action:'trash-list'});const rows=r.items||[];
     $('items').classList.add('hidden');$('trash-area').classList.remove('hidden');
-    $('trash-items').innerHTML=rows.length?rows.map(x=>`<article class="card"><h3>${esc(x.name||x.original_name||'Item')}</h3><div class="meta">${x.kind==='software'?'Software':'Arquivo'} · Excluído ${x.deleted_at?new Date(x.deleted_at).toLocaleString('pt-BR'):'—'} · Expira ${x.purge_at?new Date(x.purge_at).toLocaleDateString('pt-BR'):'—'}</div><div class="card-actions"><button class="btn secondary" data-restore="${esc(x.id)}" data-kind="${esc(x.kind)}">Restaurar</button><button class="btn danger" data-purge="${esc(x.id)}" data-kind="${esc(x.kind)}">Excluir permanentemente</button></div></article>`).join(''):'<div class="empty">A Lixeira está vazia.</div>';
+    $('trash-items').innerHTML=rows.length?rows.map(x=>`<article class="card"><h3>${esc(x.name||x.original_name||'Item')}</h3><div class="meta">${x.kind==='software'?'Software':'Arquivo'} · Excluído ${x.deleted_at?new Date(x.deleted_at).toLocaleString('pt-BR'):'—'} · Expira ${x.purge_at?new Date(x.purge_at).toLocaleDateString('pt-BR'):'—'}</div><div class="card-actions"><button class="btn secondary" data-restore="${esc(x.id)}" data-kind="${esc(x.kind)}">Restaurar</button><button class="btn danger" data-purge="${esc(x.id)}" data-kind="${esc(x.kind)}" ${!x.purge_at||new Date(x.purge_at).getTime()>Date.now()?'disabled title="Disponível após completar 30 dias na Lixeira"':''}>Excluir permanentemente</button>${!x.purge_at||new Date(x.purge_at).getTime()>Date.now()?'<span class="subtle">Disponível em '+(x.purge_at?new Date(x.purge_at).toLocaleString('pt-BR'):'após 30 dias')+'</span>':''}</div></article>`).join(''):'<div class="empty">A Lixeira está vazia.</div>';
     $('trash-items').querySelectorAll('[data-restore]').forEach(b=>b.onclick=async()=>{if(!confirm('Restaurar este item?'))return;try{await api({action:'restore-trash',id:b.dataset.restore,kind:b.dataset.kind});await load();await showTrash();}catch(e){message(e.message,true);}});
     $('trash-items').querySelectorAll('[data-purge]').forEach(b=>b.onclick=async()=>{if(!confirm('A exclusão permanente não poderá ser desfeita. Continuar?'))return;if(!confirm('Confirma novamente?'))return;try{await api({action:'purge-trash',id:b.dataset.purge,kind:b.dataset.kind});await showTrash();}catch(e){message(e.message,true);}});
   }catch(e){message(e.message,true);}
@@ -312,6 +323,7 @@ $('items').addEventListener('click',e=>{
   if(action==='archive')archiveSoftware(item);
   if(action==='trash-software')trashSoftware(item);
 });
+$('demo-open').onclick=()=>{$('demo-preview').classList.toggle('hidden');};
 $('login').onclick=async()=>{
   try {
     const {error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.href,queryParams:{prompt:'select_account'}}});
@@ -330,14 +342,18 @@ $('files').onchange=()=>{
     $('name').value=$('files').files[0].name.replace(/\.[^.]+$/,'').replace(/[_-]+/g,' ');
 };
 $('export').onclick=()=>{
-  const rows=[['Nome','Descrição','Categoria','Plataforma','Versão atual','Arquivos','Versões'],...items.map(x=>[
+  const rows=[['Nome','Descrição','Categoria','Plataforma','Versão atual','Arquivos','Versões','Status','Criado em','Atualizado em'],...items.map(x=>[
     x.name,x.description||'',x.category||'',x.platform||'',x.current_version||'',
-    (x.software_files||[]).length,(x.software_versions||[]).length
+    (x.software_files||[]).filter(f=>!f.deleted_at).length,(x.software_versions||[]).length,
+    'Ativo',x.created_at||'',x.updated_at||''
   ])];
-  const csv=rows.map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(';')).join('\r\n');
-  const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8;'});
-  const url=URL.createObjectURL(blob),a=document.createElement('a');
-  a.href=url;a.download='inventario-lima-virtual.csv';a.click();URL.revokeObjectURL(url);
+  const csv=rows.map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(';')).join('\\r\\n');
+  // UTF-16LE com BOM para melhor reconhecimento de caracteres acentuados em leitores Android/Excel.
+  const data=new Uint8Array(2+csv.length*2); data[0]=0xFF; data[1]=0xFE;
+  for(let i=0;i<csv.length;i++){const c=csv.charCodeAt(i);data[2+i*2]=c&255;data[3+i*2]=c>>8;}
+  const blob=new Blob([data],{type:'text/csv;charset=utf-16le;'});
+  const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='inventario-lima-virtual.csv';document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1500);
 };
 sb.auth.onAuthStateChange((_event,session)=>{
   sessionUI(session);
